@@ -15,26 +15,29 @@ export default async function handler(req, res) {
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID);
   const rpcEndpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT;
   const nftContractAddress = process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS;
+  const tokenIdsString = process.env.NEXT_PUBLIC_TOKEN_IDS; // 例: "0,1,2"
 
-  // 必須の環境変数がセットされているかチェック
-  if (!chainId || !rpcEndpoint || !nftContractAddress) {
+  if (!chainId || !rpcEndpoint || !nftContractAddress || !tokenIdsString) {
     return res.status(500).json({ error: '環境変数の設定が不十分です' });
   }
 
-  try {
-    // ethers.jsでBase Mainnet用のプロバイダーを作成
-    const provider = new ethers.providers.JsonRpcProvider(rpcEndpoint, chainId);
+  // カンマ区切りの文字列をパースして数値の配列に変換する
+  const tokenIds = tokenIdsString.split(',').map((id) => Number(id.trim()));
 
-    // ERC1155のABI (balanceOf)
+  try {
+    const provider = new ethers.providers.JsonRpcProvider(rpcEndpoint, chainId);
+    // ERC1155のbalanceOfBatchを使用して複数のトークンIDをチェックする
     const erc1155Abi = [
-      'function balanceOf(address account, uint256 id) view returns (uint256)'
+      "function balanceOfBatch(address[] accounts, uint256[] ids) view returns (uint256[])"
     ];
     const contract = new ethers.Contract(nftContractAddress, erc1155Abi, provider);
 
-    // ※トークンIDを 0 に変更
-    const tokenId = 0;
-    const balance = await contract.balanceOf(walletAddress, tokenId);
-    const ownsNFT = balance.gt(0);
+    // 各tokenIdについてウォレットの残高を取得するため、ウォレットアドレスを繰り返す
+    const addresses = tokenIds.map(() => walletAddress);
+    const balances = await contract.balanceOfBatch(addresses, tokenIds);
+
+    // 1つでも残高が1以上あれば保有とみなす
+    const ownsNFT = balances.some(balance => balance.gt(0));
 
     return res.status(200).json({ ownsNFT });
   } catch (err) {
