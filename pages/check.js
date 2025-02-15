@@ -13,18 +13,15 @@ export default function CheckPage() {
   const [scanning, setScanning] = useState(false);
   const [qrScanningInterval, setQrScanningInterval] = useState(null);
 
-  // カメラの初期化
+  // カメラ初期化関数
   const initCamera = async () => {
     try {
-      // まずカメラアクセス許可を取得して一度ストリームを作成
       const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
       tempStream.getTracks().forEach((track) => track.stop());
 
-      // ビデオデバイスの列挙
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter((d) => d.kind === 'videoinput');
 
-      // ラベルに "back", "rear", "後面", "リア" を含むデバイスがあればそれを使う
       const rearCamera = videoDevices.find((device) => {
         const label = device.label.toLowerCase();
         return (
@@ -40,11 +37,9 @@ export default function CheckPage() {
         setSelectedDeviceId(rearCamera.deviceId);
         constraints = { video: { deviceId: { exact: rearCamera.deviceId } } };
       } else {
-        // 見つからない場合は environment (外側カメラ) を厳密に要求
         constraints = { video: { facingMode: { exact: 'environment' } } };
       }
 
-      // 再度 getUserMedia
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(newStream);
       if (videoRef.current) {
@@ -71,20 +66,17 @@ export default function CheckPage() {
 
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(imageData.data, canvas.width, canvas.height);
-
         if (code) {
           console.log('QRコード検出:', code.data);
           let scannedData = code.data;
-
-          // ":"以前を削除
+          // ":"以前の部分を削除する
           if (scannedData.includes(':')) {
             scannedData = scannedData.substring(scannedData.indexOf(':') + 1);
           }
-          // "@"以降を削除
+          // "@"以降の部分を削除する
           if (scannedData.includes('@')) {
             scannedData = scannedData.split('@')[0];
           }
-
           setWalletAddress(scannedData);
           clearInterval(interval);
           setQrScanningInterval(null);
@@ -118,7 +110,6 @@ export default function CheckPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        // ownsNFT が true なら青文字「保有」、false なら赤文字「未保有」
         setResult(data.ownsNFT ? '保有' : '未保有');
       } else {
         setError(`エラー: ${data.error}`);
@@ -136,7 +127,6 @@ export default function CheckPage() {
     setError('');
   };
 
-  // 初回マウント時にカメラを初期化
   useEffect(() => {
     initCamera();
     return () => {
@@ -153,7 +143,6 @@ export default function CheckPage() {
   return (
     <div style={{ padding: '2rem' }}>
       <h1>NFT 保有確認</h1>
-
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
       <video
@@ -189,7 +178,6 @@ export default function CheckPage() {
       <div style={{ marginTop: '1rem' }}>
         <button onClick={handleVerify}>検証</button>
       </div>
-
       {result && (
         <div
           style={{
