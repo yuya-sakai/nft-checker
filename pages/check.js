@@ -16,17 +16,17 @@ export default function CheckPage() {
   // カメラ初期化関数
   const initCamera = async () => {
     try {
-      // まずカメラへのアクセス許可を取得（これでデバイスラベルが利用可能に）
+      // まず、カメラへのアクセス許可を取得して一時ストリームを作成（これでデバイスラベルが利用可能に）
       const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
       tempStream.getTracks().forEach((track) => track.stop());
 
-      // 利用可能なビデオデバイスを取得
+      // 利用可能なビデオデバイスを列挙
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(
         (device) => device.kind === 'videoinput'
       );
 
-      // ラベルに "back" / "rear" / "後面" / "リア" を含むデバイスを選択
+      // ラベルに "back", "rear", "後面", "リア" を含むデバイスを選択
       const rearCamera = videoDevices.find((device) => {
         const label = device.label.toLowerCase();
         return (
@@ -42,7 +42,7 @@ export default function CheckPage() {
         setSelectedDeviceId(rearCamera.deviceId);
         constraints = { video: { deviceId: { exact: rearCamera.deviceId } } };
       } else {
-        // リアカメラが見つからない場合は、厳密に外側カメラを要求する
+        // リアカメラが見つからなければ、厳密に外側カメラを要求する
         constraints = { video: { facingMode: { exact: 'environment' } } };
       }
 
@@ -73,7 +73,10 @@ export default function CheckPage() {
         const code = jsQR(imageData.data, canvas.width, canvas.height);
         if (code) {
           console.log('QRコード検出:', code.data);
-          setWalletAddress(code.data);
+          let scannedData = code.data;
+          // ":"以前のすべての文字列を削除する（例: "ethereum:" "base:" "avalanche:" など）
+          scannedData = scannedData.replace(/^[^:]*:/, '');
+          setWalletAddress(scannedData);
           clearInterval(interval);
           setQrScanningInterval(null);
           setScanning(false);
@@ -116,7 +119,7 @@ export default function CheckPage() {
     }
   };
 
-  // 初回マウント時にカメラを初期化
+  // コンポーネント初回マウント時にカメラを初期化
   useEffect(() => {
     initCamera();
     return () => {
@@ -134,7 +137,7 @@ export default function CheckPage() {
     <div style={{ padding: '2rem' }}>
       <h1>NFT 保有確認</h1>
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      
+
       {/* カメラ映像を表示 */}
       <video
         ref={videoRef}
