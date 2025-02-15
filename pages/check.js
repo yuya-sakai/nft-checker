@@ -74,7 +74,11 @@ export default function CheckPage() {
         if (code) {
           console.log('QRコード検出:', code.data);
           let scannedData = code.data;
-          // "@"以降の部分を削除する（例："0xDE023AE35fA07964396b030c72057cBC188846Df@8453" → "0xDE023AE35fA07964396b030c72057cBC188846Df"）
+          // ① ":"以前の部分（ネットワーク名など）を削除する
+          if (scannedData.includes(':')) {
+            scannedData = scannedData.substring(scannedData.indexOf(':') + 1);
+          }
+          // ② "@"以降の部分を削除する
           if (scannedData.includes('@')) {
             scannedData = scannedData.split('@')[0];
           }
