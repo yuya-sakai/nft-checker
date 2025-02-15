@@ -14,38 +14,13 @@ export default function CheckPage() {
 
   // スキャン開始時にカメラへのアクセスをリクエストし、利用可能なビデオデバイスを取得する
   useEffect(() => {
-    if (scanning) {
-      // まず、カメラへのアクセス許可を取得する（これでデバイスのラベルが取得できるようになる）
-      navigator.mediaDevices.getUserMedia({ video: true })
-        .then((stream) => {
-          // ストリームは不要なので停止
-          stream.getTracks().forEach(track => track.stop());
-          // 利用可能なビデオデバイスを列挙
-          return navigator.mediaDevices.enumerateDevices();
-        })
-        .then((devices) => {
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          // ラベルに "back"、"rear"、"後面"、"リア" を含むデバイスを探す
-          const rearCamera = videoDevices.find(device => {
-            const label = device.label.toLowerCase();
-            return label.includes('back') ||
-                   label.includes('rear') ||
-                   label.includes('後面') ||
-                   label.includes('リア');
-          });
-          if (rearCamera) {
-            setSelectedDeviceId(rearCamera.deviceId);
-          } else {
-            // 見つからなければフォールバックとして、selectedDeviceId は null のままにし、
-            // videoConstraints で facingMode を厳密に指定する
-            setSelectedDeviceId(null);
-          }
-        })
-        .catch((err) => {
-          console.error('Error accessing or enumerating devices:', err);
-          setError('カメラデバイスの取得に失敗しました');
-        });
-    }
+    navigator.mediaDevices.getUserMedia({
+  audio: false,
+  video: {
+    width: 640, height: 480,
+    facingMode: { exact: "environment" }
+  }
+})
   }, [scanning]);
 
   // QRコード読み取り結果を処理する関数
