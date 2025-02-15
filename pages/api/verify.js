@@ -1,6 +1,5 @@
 // pages/api/verify.js
 import { ethers } from 'ethers';
-import config from '../../config';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,34 +11,33 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'ウォレットアドレスが必要です' });
   }
 
+  // 環境変数から設定を取得
+  const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID);
+  const rpcEndpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT;
+  const nftContractAddress = process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS;
+
+  if (!chainId || !rpcEndpoint || !nftContractAddress) {
+    return res.status(500).json({ error: '環境変数の設定が不十分です' });
+  }
+
   try {
-    // プロバイダーを設定
-    const provider = new ethers.providers.JsonRpcProvider(
-      config.rpcEndpoint,
-      config.chainId
-    );
+    // Base Mainnet用に明示的なRPCプロバイダーを設定
+    const provider = new ethers.providers.JsonRpcProvider(rpcEndpoint, chainId);
 
-    // ERC-1155 の balanceOfBatch 関数を利用するための最小限の ABI
+    // ERC1155 の balanceOf 関数のABI
     const erc1155Abi = [
-      "function balanceOfBatch(address[] accounts, uint256[] ids) view returns (uint256[])"
+      "function balanceOf(address account, uint256 id) view returns (uint256)"
     ];
+    const contract = new ethers.Contract(nftContractAddress, erc1155Abi, provider);
 
-    const contract = new ethers.Contract(config.contractAddress, erc1155Abi, provider);
+    // 例として tokenId 1 の残高をチェックする
+    const tokenId = 1;
+    const balance = await contract.balanceOf(walletAddress, tokenId);
+    const ownsNFT = balance.gt(0);
 
-    // 例として token ID 0～100 をチェックする
-    const maxTokenId = 100;  // 必要に応じて変更してください
-    const tokenIds = Array.from({ length: maxTokenId + 1 }, (_, i) => i);
-    const accounts = Array(tokenIds.length).fill(walletAddress);
-
-    // バッチで各 token ID の残高を取得
-    const balances = await contract.balanceOfBatch(accounts, tokenIds);
-
-    // 残高が1以上のトークンがあれば、NFT 保有と判断する
-    const ownsNFT = balances.some(balance => balance.gt(0));
-
-    res.status(200).json({ ownsNFT });
+    return res.status(200).json({ ownsNFT });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.toString() });
+    return res.status(500).json({ error: err.toString() });
   }
 }
