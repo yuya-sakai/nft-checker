@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// react-qr-scanner をクライアントサイドのみ読み込む（SSR無効）
+// react-qr-scanner をクライアント側のみ読み込む（SSR無効）
 const QrScanner = dynamic(() => import('react-qr-scanner'), { ssr: false });
 
 export default function CheckPage() {
@@ -10,14 +10,14 @@ export default function CheckPage() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const [result, setResult] = useState(''); // NFT検証結果
 
-  // スキャン開始時に利用可能なビデオデバイスを列挙し、外側カメラを選択する
+  // スキャン開始時に利用可能なビデオデバイスを列挙し、外側カメラ（リアカメラ）の deviceId を取得
   useEffect(() => {
     if (scanning) {
       navigator.mediaDevices
         .enumerateDevices()
         .then((devices) => {
-          // ビデオ入力デバイスのみ抽出
           const videoDevices = devices.filter(
             (device) => device.kind === 'videoinput'
           );
@@ -29,7 +29,7 @@ export default function CheckPage() {
           if (rearCamera) {
             setSelectedDeviceId(rearCamera.deviceId);
           } else if (videoDevices.length > 0) {
-            // 見つからなければ、最初のデバイスを使用（環境によってはこちらが外側の場合もある）
+            // 見つからなければ最初のデバイスを使用
             setSelectedDeviceId(videoDevices[0].deviceId);
           }
         })
@@ -40,11 +40,10 @@ export default function CheckPage() {
     }
   }, [scanning]);
 
-  // QRコードの読み取り結果を処理する
+  // QRコード読み取り結果の処理
   const handleScan = (data) => {
     if (data) {
       console.log('QRコードデータ:', data);
-      // data の形式はライブラリによって異なるため、文字列かオブジェクトかで処理
       if (typeof data === 'string') {
         setWalletAddress(data);
       } else if (data.text) {
@@ -54,22 +53,47 @@ export default function CheckPage() {
     }
   };
 
-  // エラー処理
+  // エラー時の処理
   const handleError = (err) => {
     console.error('QR Scanner Error:', err);
     setError('QRコードの読み取りに失敗しました');
   };
 
-  // スキャンの開始/停止を切り替える
+  // スキャンの開始/停止の切替
   const toggleScanning = () => {
     setScanning(!scanning);
+  };
+
+  // 検証ボタン押下時：APIに問い合わせ、NFT保有状況に応じて結果を表示
+  const handleVerify = async () => {
+    if (!walletAddress) {
+      setError('ウォレットアドレスを入力してください');
+      return;
+    }
+    try {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletAddress }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // NFTを保有している場合は「保有」、そうでなければ「未保有」
+        setResult(data.ownsNFT ? '保有' : '未保有');
+      } else {
+        setError(`エラー: ${data.error}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('検証中にエラーが発生しました');
+    }
   };
 
   return (
     <div style={{ padding: '2rem' }}>
       <h1>NFT 保有確認</h1>
       
-      {/* ウォレットアドレス入力欄 */}
+      {/* ウォレットアドレス入力 */}
       <div style={{ marginBottom: '1rem' }}>
         <label>
           ウォレットアドレス:{' '}
@@ -83,7 +107,7 @@ export default function CheckPage() {
         </label>
       </div>
 
-      {/* スキャン開始/停止ボタン */}
+      {/* QRコードスキャン開始/停止ボタン */}
       <div style={{ marginBottom: '1rem' }}>
         <button onClick={toggleScanning}>
           {scanning ? 'QRコードスキャンを停止' : 'QRコードスキャンを開始'}
@@ -97,13 +121,24 @@ export default function CheckPage() {
             onError={handleError}
             onScan={handleScan}
             style={{ width: '100%', height: '100%' }}
-            // selectedDeviceId が取得できた場合は deviceId を指定
             videoConstraints={
               selectedDeviceId
                 ? { deviceId: { exact: selectedDeviceId } }
                 : { facingMode: 'environment' }
             }
           />
+        </div>
+      )}
+
+      {/* 検証ボタン */}
+      <div style={{ marginBottom: '1rem' }}>
+        <button onClick={handleVerify}>検証</button>
+      </div>
+
+      {/* 結果表示：NFT保有なら青文字、「保有」、保有していなければ赤文字で「未保有」 */}
+      {result && (
+        <div style={{ color: result === '保有' ? 'blue' : 'red', fontWeight: 'bold' }}>
+          {result}
         </div>
       )}
 
