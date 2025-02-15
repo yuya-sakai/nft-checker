@@ -16,7 +16,7 @@ export default function CheckPage() {
   // カメラ初期化関数
   const initCamera = async () => {
     try {
-      // まず、カメラへのアクセス許可を取得して一時ストリームを作成（これでデバイスラベルが利用可能に）
+      // まず、カメラへのアクセス許可を取得して一時ストリームを作成（デバイスラベル取得用）
       const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
       tempStream.getTracks().forEach((track) => track.stop());
 
@@ -73,9 +73,8 @@ export default function CheckPage() {
         const code = jsQR(imageData.data, canvas.width, canvas.height);
         if (code) {
           console.log('QRコード検出:', code.data);
-          let scannedData = code.data;
-          // ":"以前のすべての文字列を削除する（例: "ethereum:" "base:" "avalanche:" など）
-          scannedData = scannedData.replace(/^[^:]*:/, '');
+          // 取得した文字列から、":"以前の部分を削除する
+          let scannedData = code.data.replace(/^[^:]*:/, '');
           setWalletAddress(scannedData);
           clearInterval(interval);
           setQrScanningInterval(null);
@@ -133,6 +132,13 @@ export default function CheckPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // リセットボタン押下時：ウォレットアドレスと検証結果、エラーメッセージをクリア
+  const handleReset = () => {
+    setWalletAddress('');
+    setResult('');
+    setError('');
+  };
+
   return (
     <div style={{ padding: '2rem' }}>
       <h1>NFT 保有確認</h1>
@@ -171,6 +177,11 @@ export default function CheckPage() {
             style={{ width: '300px' }}
           />
         </label>
+      </div>
+
+      {/* リセットボタン */}
+      <div style={{ marginTop: '1rem' }}>
+        <button onClick={handleReset}>リセット</button>
       </div>
 
       {/* NFT検証ボタン */}
