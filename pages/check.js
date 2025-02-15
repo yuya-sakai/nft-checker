@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// 動的インポートで react-qr-reader を読み込み
+// react-qr-reader を動的に読み込む
 const QrReader = dynamic(
   () =>
     import('react-qr-reader').then((mod) => mod.default || mod.QrReader),
@@ -14,6 +14,8 @@ export default function CheckPage() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [scanning, setScanning] = useState(false);
+  // カメラの向きを制御するステート。初期値は外側（environment）に設定
+  const [cameraMode, setCameraMode] = useState("environment");
 
   const handleScan = (data) => {
     if (data) {
@@ -26,6 +28,11 @@ export default function CheckPage() {
   const handleError = (err) => {
     console.error("QRリーダーエラー:", err);
     setError('QRコードの読み取りに失敗しました');
+  };
+
+  // カメラの向きを切り替える関数
+  const toggleCamera = () => {
+    setCameraMode((prevMode) => (prevMode === "environment" ? "user" : "environment"));
   };
 
   return (
@@ -48,6 +55,11 @@ export default function CheckPage() {
           {scanning ? 'QRコードスキャンを停止' : 'QRコードスキャンを開始'}
         </button>
       </div>
+      <div style={{ marginBottom: '1rem' }}>
+        <button onClick={toggleCamera}>
+          カメラ切替（現在: {cameraMode === "environment" ? "外側" : "内側"}）
+        </button>
+      </div>
       {scanning && (
         <div style={{ width: '300px', height: '300px', marginBottom: '1rem' }}>
           <QrReader
@@ -56,7 +68,7 @@ export default function CheckPage() {
             onScan={handleScan}
             style={{ width: '100%' }}
             videoConstraints={{
-              facingMode: { exact: "environment" }  // ここで外側（リア）のカメラを指定
+              facingMode: cameraMode // cameraMode に応じたカメラを使用
             }}
           />
         </div>
