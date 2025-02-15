@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
+// 動的インポートで react-qr-reader を読み込み
 const QrReader = dynamic(
   () =>
     import('react-qr-reader').then((mod) => mod.default || mod.QrReader),
@@ -55,15 +56,13 @@ export default function CheckPage() {
             onScan={handleScan}
             style={{ width: '100%' }}
             videoConstraints={{
-              facingMode: "environment"  // 外側のカメラを指定
+              facingMode: { exact: "environment" }  // ここで外側（リア）のカメラを指定
             }}
           />
         </div>
       )}
       <div style={{ marginBottom: '1rem' }}>
-        <button onClick={() => {
-          // ここに検証用の関数を呼び出すなどの処理
-        }}>
+        <button onClick={() => { /* 検証用の関数をここに追加 */ }}>
           検証
         </button>
       </div>
