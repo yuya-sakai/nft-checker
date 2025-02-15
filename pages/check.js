@@ -1,7 +1,7 @@
+// pages/check.js
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// react-qr-reader のエクスポート方法に対応するため、default または QrReader を取得する
 const QrReader = dynamic(
   () =>
     import('react-qr-reader').then((mod) => mod.default || mod.QrReader),
@@ -16,34 +16,15 @@ export default function CheckPage() {
 
   const handleScan = (data) => {
     if (data) {
+      console.log("QRコードデータ:", data);
       setWalletAddress(data);
       setScanning(false);
     }
   };
 
   const handleError = (err) => {
-    console.error(err);
+    console.error("QRリーダーエラー:", err);
     setError('QRコードの読み取りに失敗しました');
-  };
-
-  const handleVerify = async () => {
-    setError('');
-    setResult(null);
-    if (!walletAddress) {
-      setError('ウォレットアドレスを入力してください');
-      return;
-    }
-    const res = await fetch('/api/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ walletAddress }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setResult(data.ownsNFT ? '保有' : '未保有');
-    } else {
-      setError(`エラー: ${data.error}`);
-    }
   };
 
   return (
@@ -73,11 +54,18 @@ export default function CheckPage() {
             onError={handleError}
             onScan={handleScan}
             style={{ width: '100%' }}
+            videoConstraints={{
+              facingMode: "environment"  // 外側のカメラを指定
+            }}
           />
         </div>
       )}
       <div style={{ marginBottom: '1rem' }}>
-        <button onClick={handleVerify}>検証</button>
+        <button onClick={() => {
+          // ここに検証用の関数を呼び出すなどの処理
+        }}>
+          検証
+        </button>
       </div>
       {result && (
         <div style={{ color: result === '保有' ? 'blue' : 'red', fontWeight: 'bold' }}>
