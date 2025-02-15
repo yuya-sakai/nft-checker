@@ -1,53 +1,73 @@
 // pages/check.js
-import { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
-
-// react-qr-scanner を SSR 無効で動的にインポート
-const QrScanner = dynamic(() => import('react-qr-scanner'), { ssr: false });
+import { useEffect, useRef, useState } from 'react';
 
 export default function CheckPage() {
-  const [walletAddress, setWalletAddress] = useState('');
-  const [scanning, setScanning] = useState(false);
+  const videoRef = useRef(null);
   const [error, setError] = useState('');
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  const [result, setResult] = useState('');
+  const [stream, setStream] = useState(null);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [result, setResult] = useState(''); // NFT検証結果
 
-  // スキャン開始時にカメラへのアクセスをリクエストし、利用可能なビデオデバイスを取得する
-  useEffect(() => {
-    navigator.mediaDevices.getUserMedia({
-  audio: false,
-  video: {
-    width: 640, height: 480,
-    facingMode: { exact: "environment" }
-  }
-})
-  }, [scanning]);
+  // カメラ初期化関数
+  const initCamera = async () => {
+    try {
+      // まず、一度カメラへのアクセスをリクエストして許可を得る
+      const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      tempStream.getTracks().forEach((track) => track.stop());
 
-  // QRコード読み取り結果を処理する関数
-  const handleScan = (data) => {
-    if (data) {
-      console.log('QRコードデータ:', data);
-      if (typeof data === 'string') {
-        setWalletAddress(data);
-      } else if (data.text) {
-        setWalletAddress(data.text);
+      // 利用可能なビデオデバイスを列挙
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(
+        (device) => device.kind === 'videoinput'
+      );
+
+      // ラベルに "back" / "rear" / "後面" / "リア" を含むデバイスを選択
+      const rearCamera = videoDevices.find((device) => {
+        const label = device.label.toLowerCase();
+        return (
+          label.includes('back') ||
+          label.includes('rear') ||
+          label.includes('後面') ||
+          label.includes('リア')
+        );
+      });
+
+      let constraints;
+      if (rearCamera) {
+        setSelectedDeviceId(rearCamera.deviceId);
+        constraints = { video: { deviceId: { exact: rearCamera.deviceId } } };
+      } else {
+        // 見つからなければ、厳密に外側カメラを要求する
+        constraints = { video: { facingMode: { exact: 'environment' } } };
       }
-      setScanning(false);
+
+      // 選択した制約でカメラを起動
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      setStream(newStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+      }
+    } catch (err) {
+      console.error('Camera initialization error:', err);
+      setError('カメラの初期化に失敗しました: ' + err.message);
     }
   };
 
-  // エラー時の処理
-  const handleError = (err) => {
-    console.error('QR Scanner Error:', err);
-    setError('QRコードの読み取りに失敗しました');
-  };
+  // コンポーネント初回マウント時にカメラを初期化
+  useEffect(() => {
+    initCamera();
+    // アンマウント時にストリームを停止
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+    // stream を依存配列に入れないことで、一度だけ初期化する
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // スキャンの開始/停止切替
-  const toggleScanning = () => {
-    setScanning(!scanning);
-  };
-
-  // 検証ボタン押下時：バックエンドの /api/verify で NFT 保有状況を確認する
+  // NFT保有検証処理：/api/verify にウォレットアドレスを送信
   const handleVerify = async () => {
     if (!walletAddress) {
       setError('ウォレットアドレスを入力してください');
@@ -75,8 +95,28 @@ export default function CheckPage() {
     <div style={{ padding: '2rem' }}>
       <h1>NFT 保有確認</h1>
 
+      {/* エラー表示 */}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+
+      {/* カメラ映像表示 */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        style={{
+          width: '300px',
+          height: '300px',
+          background: '#000'
+        }}
+      />
+
+      {/* カメラ再初期化ボタン */}
+      <div style={{ marginTop: '1rem' }}>
+        <button onClick={initCamera}>カメラ再初期化</button>
+      </div>
+
       {/* ウォレットアドレス入力 */}
-      <div style={{ marginBottom: '1rem' }}>
+      <div style={{ marginTop: '1rem' }}>
         <label>
           ウォレットアドレス:{' '}
           <input
@@ -89,43 +129,23 @@ export default function CheckPage() {
         </label>
       </div>
 
-      {/* QRコードスキャンの開始/停止ボタン */}
-      <div style={{ marginBottom: '1rem' }}>
-        <button onClick={toggleScanning}>
-          {scanning ? 'QRコードスキャンを停止' : 'QRコードスキャンを開始'}
-        </button>
-      </div>
-
-      {/* QRコードスキャナー */}
-      {scanning && (
-        <div style={{ width: '300px', height: '300px', marginBottom: '1rem' }}>
-          <QrScanner
-            onError={handleError}
-            onScan={handleScan}
-            style={{ width: '100%', height: '100%' }}
-            videoConstraints={
-              selectedDeviceId
-                ? { deviceId: { exact: selectedDeviceId } }
-                : { facingMode: { exact: 'environment' } }
-            }
-          />
-        </div>
-      )}
-
-      {/* 検証ボタン */}
-      <div style={{ marginBottom: '1rem' }}>
+      {/* NFT検証ボタン */}
+      <div style={{ marginTop: '1rem' }}>
         <button onClick={handleVerify}>検証</button>
       </div>
 
-      {/* 結果表示（NFT保有の場合は青、未保有の場合は赤） */}
+      {/* 検証結果表示：NFT保有なら青、未保有なら赤 */}
       {result && (
-        <div style={{ color: result === '保有' ? 'blue' : 'red', fontWeight: 'bold' }}>
+        <div
+          style={{
+            marginTop: '1rem',
+            color: result === '保有' ? 'blue' : 'red',
+            fontWeight: 'bold'
+          }}
+        >
           {result}
         </div>
       )}
-
-      {/* エラー表示 */}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
     </div>
   );
 }
