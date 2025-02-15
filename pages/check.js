@@ -1,6 +1,7 @@
 // pages/check.js
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
+import { ethers } from 'ethers';
 
 export default function CheckPage() {
   const videoRef = useRef(null);
@@ -73,9 +74,31 @@ export default function CheckPage() {
         const code = jsQR(imageData.data, canvas.width, canvas.height);
         if (code) {
           console.log('QRコード検出:', code.data);
-          // 取得した文字列から、":"以前の部分を削除する
-          let scannedData = code.data.replace(/^[^:]*:/, '');
-          setWalletAddress(scannedData);
+          let scannedData = code.data;
+
+          // もし取得内容に".eth"などが含まれる場合、ENS名と判断して解決を試みる
+          if (scannedData.includes('.eth') || scannedData.includes('.xyz') || scannedData.includes('.luxe')) {
+            // Ethereum Mainnet のプロバイダーを利用（Infura のプロジェクトIDを設定してください）
+            const provider = new ethers.providers.JsonRpcProvider('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID', 1);
+            provider.resolveName(scannedData)
+              .then((resolvedAddress) => {
+                if (resolvedAddress) {
+                  setWalletAddress(resolvedAddress);
+                } else {
+                  // 解決できなかった場合はそのままENS名をセット（もしくはエラー処理）
+                  setWalletAddress(scannedData);
+                }
+              })
+              .catch((err) => {
+                console.error('ENS resolution error:', err);
+                // エラー時はそのままENS名をセットするか、エラーメッセージ表示する
+                setWalletAddress(scannedData);
+              });
+          } else {
+            // ENSでない場合、もしネットワーク名が含まれていれば削除する（":"以前の部分を削除）
+            scannedData = scannedData.replace(/^[^:]*:/, '');
+            setWalletAddress(scannedData);
+          }
           clearInterval(interval);
           setQrScanningInterval(null);
           setScanning(false);
@@ -118,6 +141,13 @@ export default function CheckPage() {
     }
   };
 
+  // リセットボタン押下時：ウォレットアドレス、検証結果、エラーメッセージをクリア
+  const handleReset = () => {
+    setWalletAddress('');
+    setResult('');
+    setError('');
+  };
+
   // コンポーネント初回マウント時にカメラを初期化
   useEffect(() => {
     initCamera();
@@ -131,13 +161,6 @@ export default function CheckPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // リセットボタン押下時：ウォレットアドレスと検証結果、エラーメッセージをクリア
-  const handleReset = () => {
-    setWalletAddress('');
-    setResult('');
-    setError('');
-  };
 
   return (
     <div style={{ padding: '2rem' }}>
