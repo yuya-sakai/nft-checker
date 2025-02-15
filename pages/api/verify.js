@@ -11,26 +11,27 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'ウォレットアドレスが必要です' });
   }
 
-  // 環境変数から設定を取得
+  // 環境変数を取得
   const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID);
   const rpcEndpoint = process.env.NEXT_PUBLIC_RPC_ENDPOINT;
   const nftContractAddress = process.env.NEXT_PUBLIC_NFT_CONTRACT_ADDRESS;
 
+  // 必須の環境変数がセットされているかチェック
   if (!chainId || !rpcEndpoint || !nftContractAddress) {
     return res.status(500).json({ error: '環境変数の設定が不十分です' });
   }
 
   try {
-    // Base Mainnet用に明示的なRPCプロバイダーを設定
+    // ethers.js で RPC エンドポイント + チェーンID を指定してプロバイダーを作成
     const provider = new ethers.providers.JsonRpcProvider(rpcEndpoint, chainId);
 
-    // ERC1155 の balanceOf 関数のABI
+    // ERC1155 の ABI (balanceOf)
     const erc1155Abi = [
-      "function balanceOf(address account, uint256 id) view returns (uint256)"
+      'function balanceOf(address account, uint256 id) view returns (uint256)'
     ];
     const contract = new ethers.Contract(nftContractAddress, erc1155Abi, provider);
 
-    // 例として tokenId 1 の残高をチェックする
+    // 例として tokenId = 1 をチェック
     const tokenId = 1;
     const balance = await contract.balanceOf(walletAddress, tokenId);
     const ownsNFT = balance.gt(0);
