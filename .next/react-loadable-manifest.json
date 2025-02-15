@@ -1,8 +1,8 @@
 {
-  "check.js -> react-qr-reader": {
-    "id": "check.js -> react-qr-reader",
+  "check.js -> react-qr-scanner": {
+    "id": "check.js -> react-qr-scanner",
     "files": [
-      "static/chunks/node_modules_react-qr-reader_dist_esm_index_js.js"
+      "static/chunks/node_modules_react-qr-scanner_dist_react-qr-scanner_umd_js.js"
     ]
   }
 }
