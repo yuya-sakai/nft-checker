@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 
-// react-qr-scanner をクライアント側のみ読み込む（SSR無効）
+// react-qr-scanner を SSR 無効で動的にインポート
 const QrScanner = dynamic(() => import('react-qr-scanner'), { ssr: false });
 
 export default function CheckPage() {
@@ -10,37 +10,45 @@ export default function CheckPage() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  const [result, setResult] = useState(''); // NFT検証結果
+  const [result, setResult] = useState('');
 
-  // スキャン開始時に利用可能なビデオデバイスを列挙し、外側カメラ（リアカメラ）の deviceId を取得
+  // スキャン開始時にカメラへのアクセスをリクエストし、利用可能なビデオデバイスを取得する
   useEffect(() => {
     if (scanning) {
-      navigator.mediaDevices
-        .enumerateDevices()
+      // まず、カメラへのアクセス許可を取得する（これでデバイスのラベルが取得できるようになる）
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then((stream) => {
+          // ストリームは不要なので停止
+          stream.getTracks().forEach(track => track.stop());
+          // 利用可能なビデオデバイスを列挙
+          return navigator.mediaDevices.enumerateDevices();
+        })
         .then((devices) => {
-          const videoDevices = devices.filter(
-            (device) => device.kind === 'videoinput'
-          );
-          // ラベルに "back" または "rear" が含まれるデバイスを探す
-          const rearCamera = videoDevices.find((device) => {
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          // ラベルに "back"、"rear"、"後面"、"リア" を含むデバイスを探す
+          const rearCamera = videoDevices.find(device => {
             const label = device.label.toLowerCase();
-            return label.includes('back') || label.includes('rear');
+            return label.includes('back') ||
+                   label.includes('rear') ||
+                   label.includes('後面') ||
+                   label.includes('リア');
           });
           if (rearCamera) {
             setSelectedDeviceId(rearCamera.deviceId);
-          } else if (videoDevices.length > 0) {
-            // 見つからなければ最初のデバイスを使用
-            setSelectedDeviceId(videoDevices[0].deviceId);
+          } else {
+            // 見つからなければフォールバックとして、selectedDeviceId は null のままにし、
+            // videoConstraints で facingMode を厳密に指定する
+            setSelectedDeviceId(null);
           }
         })
         .catch((err) => {
-          console.error('Error enumerating devices:', err);
+          console.error('Error accessing or enumerating devices:', err);
           setError('カメラデバイスの取得に失敗しました');
         });
     }
   }, [scanning]);
 
-  // QRコード読み取り結果の処理
+  // QRコード読み取り結果を処理する関数
   const handleScan = (data) => {
     if (data) {
       console.log('QRコードデータ:', data);
@@ -59,12 +67,12 @@ export default function CheckPage() {
     setError('QRコードの読み取りに失敗しました');
   };
 
-  // スキャンの開始/停止の切替
+  // スキャンの開始/停止切替
   const toggleScanning = () => {
     setScanning(!scanning);
   };
 
-  // 検証ボタン押下時：APIに問い合わせ、NFT保有状況に応じて結果を表示
+  // 検証ボタン押下時：バックエンドの /api/verify で NFT 保有状況を確認する
   const handleVerify = async () => {
     if (!walletAddress) {
       setError('ウォレットアドレスを入力してください');
@@ -78,7 +86,6 @@ export default function CheckPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        // NFTを保有している場合は「保有」、そうでなければ「未保有」
         setResult(data.ownsNFT ? '保有' : '未保有');
       } else {
         setError(`エラー: ${data.error}`);
@@ -92,7 +99,7 @@ export default function CheckPage() {
   return (
     <div style={{ padding: '2rem' }}>
       <h1>NFT 保有確認</h1>
-      
+
       {/* ウォレットアドレス入力 */}
       <div style={{ marginBottom: '1rem' }}>
         <label>
@@ -107,7 +114,7 @@ export default function CheckPage() {
         </label>
       </div>
 
-      {/* QRコードスキャン開始/停止ボタン */}
+      {/* QRコードスキャンの開始/停止ボタン */}
       <div style={{ marginBottom: '1rem' }}>
         <button onClick={toggleScanning}>
           {scanning ? 'QRコードスキャンを停止' : 'QRコードスキャンを開始'}
@@ -124,7 +131,7 @@ export default function CheckPage() {
             videoConstraints={
               selectedDeviceId
                 ? { deviceId: { exact: selectedDeviceId } }
-                : { facingMode: 'environment' }
+                : { facingMode: { exact: 'environment' } }
             }
           />
         </div>
@@ -135,7 +142,7 @@ export default function CheckPage() {
         <button onClick={handleVerify}>検証</button>
       </div>
 
-      {/* 結果表示：NFT保有なら青文字、「保有」、保有していなければ赤文字で「未保有」 */}
+      {/* 結果表示（NFT保有の場合は青、未保有の場合は赤） */}
       {result && (
         <div style={{ color: result === '保有' ? 'blue' : 'red', fontWeight: 'bold' }}>
           {result}
